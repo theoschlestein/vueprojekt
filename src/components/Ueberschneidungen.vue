@@ -39,6 +39,7 @@ const termineStore = useTermineStore()
 .ueberschneidungen h3 {
   margin: 0 0 0.75rem;
   font-size: 1rem;
+  font-weight: 700;
 }
 
 .leer {

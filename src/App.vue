@@ -22,9 +22,10 @@ import Kalender from './components/Kalender.vue'
 
 .titel {
   width: 100%;
-  max-width: 960px;
+  max-width: 1240px;
   box-sizing: border-box;
-  margin: 1.5rem 1rem 1rem;
+  margin: 1.5rem auto 1rem;
+  padding: 0 1rem;
   text-align: left;
 }
 </style>
