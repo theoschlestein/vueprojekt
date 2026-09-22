@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import deLocale from '@fullcalendar/core/locales/de'
+import { useTermineStore } from '@/stores/termine'
 
 // Referenz auf die FullCalendar-Instanz (für die Heute-Funktion)
 const calendarRef = ref(null)
@@ -16,9 +17,18 @@ function zuHeuteSpringen() {
   calendarRef.value?.getApi().today()
 }
 
-// Gespeicherte Einträge - jeder mit eigener id, damit man ihn
-// beim Klick auf den Kalender-Eintrag wiederfindet
-const termine = ref([])
+// Termine kommen jetzt aus Supabase, verwaltet über den Pinia-Store
+const termineStore = useTermineStore()
+const termine = computed(() => termineStore.termine)
+
+onMounted(() => {
+  termineStore.laden()
+  termineStore.liveSyncStarten()
+})
+
+onUnmounted(() => {
+  termineStore.liveSyncStoppen()
+})
 
 // Zustand des Fensters
 const dialogOffen = ref(false)
@@ -55,7 +65,7 @@ function terminGeklickt(info) {
 }
 
 // Speichern-Button im Fenster (legt neu an ODER aktualisiert)
-function speichern() {
+async function speichern() {
   if (!name.value.trim()) {
     fehler.value = 'Bitte einen Namen eintragen.'
     return
@@ -67,16 +77,14 @@ function speichern() {
 
   if (bearbeiteteId.value) {
     // Bestehenden Termin aktualisieren
-    const termin = termine.value.find((t) => t.id === bearbeiteteId.value)
-    if (termin) {
-      termin.name = name.value.trim()
-      termin.vonZeit = vonZeit.value
-      termin.bisZeit = bisZeit.value
-    }
+    await termineStore.aktualisieren(bearbeiteteId.value, {
+      name: name.value.trim(),
+      vonZeit: vonZeit.value,
+      bisZeit: bisZeit.value
+    })
   } else {
     // Neuen Termin anlegen
-    termine.value.push({
-      id: crypto.randomUUID(),
+    await termineStore.anlegen({
       datum: gewaehltesDatum.value,
       name: name.value.trim(),
       vonZeit: vonZeit.value,
@@ -88,8 +96,8 @@ function speichern() {
 }
 
 // Löschen-Button im Fenster (nur sichtbar beim Bearbeiten)
-function loeschen() {
-  termine.value = termine.value.filter((t) => t.id !== bearbeiteteId.value)
+async function loeschen() {
+  await termineStore.loeschen(bearbeiteteId.value)
   dialogOffen.value = false
 }
 
