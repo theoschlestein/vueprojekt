@@ -6,6 +6,7 @@ create table if not exists termine (
   name text not null,
   von_zeit time not null,
   bis_zeit time not null,
+  farbe text not null default '#f59e0b',
   created_at timestamptz not null default now()
 );
 

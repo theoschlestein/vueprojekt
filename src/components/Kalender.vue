@@ -5,6 +5,10 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import deLocale from '@fullcalendar/core/locales/de'
 import { useTermineStore } from '@/stores/termine'
+import Ueberschneidungen from './Ueberschneidungen.vue'
+
+// Auswahl an Farben für Termine
+const farbOptionen = ['#f59e0b', '#3b82f6', '#22c55e', '#ec4899', '#8b5cf6', '#ef4444']
 
 // Referenz auf die FullCalendar-Instanz (für die Heute-Funktion)
 const calendarRef = ref(null)
@@ -37,6 +41,7 @@ const gewaehltesDatum = ref('')
 const name = ref('')
 const vonZeit = ref('09:00')
 const bisZeit = ref('17:00')
+const farbe = ref(farbOptionen[0])
 const fehler = ref('')
 
 // Klick auf einen leeren Tag: Fenster für NEUEN Termin öffnen
@@ -46,6 +51,7 @@ function tagGeklickt(info) {
   name.value = ''
   vonZeit.value = '09:00'
   bisZeit.value = '17:00'
+  farbe.value = farbOptionen[0]
   fehler.value = ''
   dialogOffen.value = true
 }
@@ -60,6 +66,7 @@ function terminGeklickt(info) {
   name.value = termin.name
   vonZeit.value = termin.vonZeit
   bisZeit.value = termin.bisZeit
+  farbe.value = termin.farbe
   fehler.value = ''
   dialogOffen.value = true
 }
@@ -80,7 +87,8 @@ async function speichern() {
     await termineStore.aktualisieren(bearbeiteteId.value, {
       name: name.value.trim(),
       vonZeit: vonZeit.value,
-      bisZeit: bisZeit.value
+      bisZeit: bisZeit.value,
+      farbe: farbe.value
     })
   } else {
     // Neuen Termin anlegen
@@ -88,7 +96,8 @@ async function speichern() {
       datum: gewaehltesDatum.value,
       name: name.value.trim(),
       vonZeit: vonZeit.value,
-      bisZeit: bisZeit.value
+      bisZeit: bisZeit.value,
+      farbe: farbe.value
     })
   }
 
@@ -112,7 +121,9 @@ const terminEvents = computed(() =>
     id: t.id,
     title: `${t.name}: ${t.vonZeit}–${t.bisZeit} Uhr`,
     start: `${t.datum}T${t.vonZeit}:00`,
-    end: `${t.datum}T${t.bisZeit}:00`
+    end: `${t.datum}T${t.bisZeit}:00`,
+    backgroundColor: t.farbe,
+    borderColor: t.farbe
   }))
 )
 
@@ -146,10 +157,14 @@ const calendarOptions = computed(() => ({
 <template>
   <div class="kalender-seite">
 
-    <!-- 2. Monat + Wechsel (kommt aus FullCalendars eigenem Toolbar) -->
-    <!-- 3. Raster -->
-    <div class="kalender-wrapper">
-      <FullCalendar ref="calendarRef" :options="calendarOptions" class="kalender" />
+    <div class="kalender-layout">
+      <!-- 2. Monat + Wechsel (kommt aus FullCalendars eigenem Toolbar) -->
+      <!-- 3. Raster -->
+      <div class="kalender-wrapper">
+        <FullCalendar ref="calendarRef" :options="calendarOptions" class="kalender" />
+      </div>
+
+      <Ueberschneidungen />
     </div>
 
     <!-- Das Fenster: nur sichtbar, wenn dialogOffen true ist -->
@@ -172,7 +187,24 @@ const calendarOptions = computed(() => ({
           <input type="time" v-model="bisZeit" />
         </label>
 
+        <label>
+          Farbe:
+          <span class="farbauswahl">
+            <button
+              v-for="option in farbOptionen"
+              :key="option"
+              type="button"
+              class="farbknopf"
+              :class="{ aktiv: farbe === option }"
+              :style="{ backgroundColor: option }"
+              :aria-label="`Farbe ${option}`"
+              @click="farbe = option"
+            ></button>
+          </span>
+        </label>
+
         <p v-if="fehler" class="fehler">{{ fehler }}</p>
+        <p v-else-if="termineStore.fehler" class="fehler">{{ termineStore.fehler }}</p>
 
         <div class="knoepfe">
           <button v-if="bearbeiteteId" @click="loeschen" class="loeschen">Löschen</button>
@@ -190,17 +222,31 @@ const calendarOptions = computed(() => ({
   flex-direction: column;
   gap: 1rem;
   width: 100%;
-  max-width: 960px;
+  max-width: 1240px;
   margin: 0 auto;
   padding: 0 1rem;
   box-sizing: border-box;
 }
 
+/* Kalender links, Überschneidungs-Fenster rechts daneben */
+.kalender-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
 /* Äußerer Rahmen: feste Breite, kein "Atmen" durch Inhalt */
 .kalender-wrapper {
   width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   overflow: hidden;
+}
+
+@media (max-width: 780px) {
+  .kalender-layout {
+    flex-direction: column;
+  }
 }
 
 /* ---------- Toolbar (Monat + Wechsel) ---------- */
@@ -359,6 +405,21 @@ const calendarOptions = computed(() => ({
   min-width: 0;
   padding: 0.35rem 0.5rem;
   box-sizing: border-box;
+}
+.farbauswahl {
+  display: flex;
+  gap: 0.4rem;
+}
+.farbknopf {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.farbknopf.aktiv {
+  border-color: #1e293b;
 }
 .knoepfe {
   display: flex;

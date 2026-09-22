@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -10,8 +10,15 @@ function vonSupabase(row) {
     datum: row.datum,
     name: row.name,
     vonZeit: row.von_zeit.slice(0, 5),
-    bisZeit: row.bis_zeit.slice(0, 5)
+    bisZeit: row.bis_zeit.slice(0, 5),
+    farbe: row.farbe
   }
+}
+
+// Zwei Zeitspannen überschneiden sich, wenn eine vor dem Ende der
+// anderen beginnt - in beide Richtungen geprüft
+function ueberschneidenSich(a, b) {
+  return a.vonZeit < b.bisZeit && b.vonZeit < a.bisZeit
 }
 
 export const useTermineStore = defineStore('termine', () => {
@@ -39,10 +46,11 @@ export const useTermineStore = defineStore('termine', () => {
     laedt.value = false
   }
 
-  async function anlegen({ datum, name, vonZeit, bisZeit }) {
+  async function anlegen({ datum, name, vonZeit, bisZeit, farbe }) {
+    fehler.value = ''
     const { data, error } = await supabase
       .from('termine')
-      .insert({ datum, name, von_zeit: vonZeit, bis_zeit: bisZeit })
+      .insert({ datum, name, von_zeit: vonZeit, bis_zeit: bisZeit, farbe })
       .select()
       .single()
 
@@ -53,10 +61,11 @@ export const useTermineStore = defineStore('termine', () => {
     termine.value.push(vonSupabase(data))
   }
 
-  async function aktualisieren(id, { name, vonZeit, bisZeit }) {
+  async function aktualisieren(id, { name, vonZeit, bisZeit, farbe }) {
+    fehler.value = ''
     const { data, error } = await supabase
       .from('termine')
-      .update({ name, von_zeit: vonZeit, bis_zeit: bisZeit })
+      .update({ name, von_zeit: vonZeit, bis_zeit: bisZeit, farbe })
       .eq('id', id)
       .select()
       .single()
@@ -70,6 +79,7 @@ export const useTermineStore = defineStore('termine', () => {
   }
 
   async function loeschen(id) {
+    fehler.value = ''
     const { error } = await supabase.from('termine').delete().eq('id', id)
 
     if (error) {
@@ -110,10 +120,30 @@ export const useTermineStore = defineStore('termine', () => {
     }
   }
 
+  // Tage, an denen sich mindestens zwei Termine zeitlich überschneiden -
+  // inklusive aller Termine dieses Tages, damit man sie anzeigen kann
+  const tageMitUeberschneidung = computed(() => {
+    const nachTag = {}
+    for (const termin of termine.value) {
+      if (!nachTag[termin.datum]) nachTag[termin.datum] = []
+      nachTag[termin.datum].push(termin)
+    }
+
+    return Object.entries(nachTag)
+      .filter(([, tagesTermine]) =>
+        tagesTermine.some((a, i) =>
+          tagesTermine.some((b, j) => i !== j && ueberschneidenSich(a, b))
+        )
+      )
+      .map(([datum, tagesTermine]) => ({ datum, termine: tagesTermine }))
+      .sort((a, b) => a.datum.localeCompare(b.datum))
+  })
+
   return {
     termine,
     laedt,
     fehler,
+    tageMitUeberschneidung,
     laden,
     anlegen,
     aktualisieren,
